@@ -47,6 +47,9 @@ def process_and_merge_csvs(folder_path):
 
 
 def update_qvalues(df):
+
+    df = df.sort_values(by='protein_global_qvalue')
+
     # Count total number of decoy proteins
     targets = (1-df["is_decoy"]).cumsum()
     decoys = df["is_decoy"].cumsum()
