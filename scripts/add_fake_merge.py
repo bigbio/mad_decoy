@@ -22,6 +22,10 @@ def process_and_merge_csvs(folder_path):
         fake_protein = 0
 
         for qvalue in unique_qvalues:
+            # Todo: Lukas - I think this two conditions are always true (sorted_df['is_decoy'] == 0) and
+            # len(sorted_df[(sorted_df['protein_global_qvalue'] <= qvalue) & (sorted_df['is_decoy'] == 1)]) is always 0
+            # because we filtered out rows with is_decoy set to 1 in line 13. Please double check.
+
             count = len(sorted_df[(sorted_df['protein_global_qvalue'] <= qvalue) & (sorted_df['is_decoy'] == 0)])
             num_fake_entries = int(count * qvalue) - len(sorted_df[(sorted_df['protein_global_qvalue'] <= qvalue) & (sorted_df['is_decoy'] == 1)])
 
@@ -50,7 +54,7 @@ def update_qvalues(df):
 
     df = df.sort_values(by='protein_global_qvalue')
 
-    # Count total number of decoy proteins
+    # Count the total number of decoy proteins
     targets = (1-df["is_decoy"]).cumsum()
     decoys = df["is_decoy"].cumsum()
 
@@ -75,14 +79,16 @@ def remove_duplicates(df):
     
     return df
 
-# After merging and processing:
-output_df = process_and_merge_csvs('in')
+# add the main script to start the tool from command line
+if __name__ == "__main__":
+    import argparse
 
-# Remove duplicate protein entries:
-output_df = remove_duplicates(output_df)
+    parser = argparse.ArgumentParser(description='Process and merge CSV files')
+    parser.add_argument('--folder_path', dest='folder_path', required=True, help='Path to folder containing CSV files')
+    parser.add_argument('--output_file', dest='output_file', required=True, help='Path to output CSV file')
+    args = parser.parse_args()
 
-# Update the qvalues:
-output_df = update_qvalues(output_df)
-
-# Save the final dataframe to a CSV
-output_df.to_csv('out/final_processed_and_merged.csv', index=False)
+    output_df = process_and_merge_csvs(args.folder_path)
+    output_df = remove_duplicates(output_df)
+    output_df = update_qvalues(output_df)
+    output_df.to_csv(args.output_file, index=False)
