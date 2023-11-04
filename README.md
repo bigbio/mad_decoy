@@ -39,5 +39,6 @@ In the folder where the script will be run, all projects should be represented w
 ## Contributors
 
 Lukas Kall - Statistical Biotechnology at KTH
+
 Yasset Perez-Riverol - EMBL-EBI 
 
