@@ -1,5 +1,8 @@
+import logging
+
 import pandas as pd
 import glob
+
 
 def process_and_merge_csvs(folder_path):
     all_files = glob.glob(folder_path + "/*.tsv")
@@ -8,6 +11,14 @@ def process_and_merge_csvs(folder_path):
     for filename in all_files:
         # Step 1: Read each CSV file
         df = pd.read_csv(filename)
+
+        ## remove all proteins with q-value Nan (this is a bug in the code)
+        df = df[df['protein_global_qvalue'].notna()]
+        ## continue if df is empty
+        if df.empty:
+            continue
+
+        print(f"Processing file: {filename}")
 
         # Step 2: Filter out rows with is_decoy set to 1
         filtered_df = df[df['is_decoy'] == 0]
@@ -24,7 +35,7 @@ def process_and_merge_csvs(folder_path):
         for qvalue in unique_qvalues:
             # Todo: Lukas - I think this two conditions are always true (sorted_df['is_decoy'] == 0) and
             # len(sorted_df[(sorted_df['protein_global_qvalue'] <= qvalue) & (sorted_df['is_decoy'] == 1)]) is always 0
-            # because we filtered out rows with is_decoy set to 1 in line 13. Please double check.
+            # because we filtered out rows with is_decoy set to 1 in line 24. Please double check.
 
             count = len(sorted_df[(sorted_df['protein_global_qvalue'] <= qvalue) & (sorted_df['is_decoy'] == 0)])
             num_fake_entries = int(count * qvalue) - len(sorted_df[(sorted_df['protein_global_qvalue'] <= qvalue) & (sorted_df['is_decoy'] == 1)])
@@ -50,7 +61,7 @@ def process_and_merge_csvs(folder_path):
     return merged_df
 
 
-def update_qvalues(df):
+def update_qvalues(df, filter_qvalue : float, filter_decoy :bool):
 
     df = df.sort_values(by='protein_global_qvalue')
 
@@ -61,9 +72,13 @@ def update_qvalues(df):
     # Calculate the ratio
     
     # Update the protein_global_qvalue for each protein
-    df['protein_global_qvalue'] = decoys / targets
+    df['protein_adjusted_qvalue'] = decoys / targets
 
-    df['protein_global_qvalue'] = df['protein_global_qvalue'][::-1].cummin()[::-1]
+    df['protein_adjusted_qvalue'] = df['protein_adjusted_qvalue'][::-1].cummin()[::-1]
+    if filter_qvalue is not None:
+        df = df[df['protein_adjusted_qvalue'] <= float(filter_qvalue)]
+    if filter_decoy:
+        df = df[df['is_decoy'] == 1]
 
     return df
 
@@ -86,9 +101,11 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser(description='Process and merge CSV files')
     parser.add_argument('--folder_path', dest='folder_path', required=True, help='Path to folder containing CSV files')
     parser.add_argument('--output_file', dest='output_file', required=True, help='Path to output CSV file')
+    parser.add_argument('--filter_qvalue', dest='filter_qvalue', required=False, help='Filter q-value')
+    parser.add_argument('--filter_decoy', dest='filter_decoy', action='store_true', required=False, help='Filter decoy')
     args = parser.parse_args()
 
     output_df = process_and_merge_csvs(args.folder_path)
     output_df = remove_duplicates(output_df)
-    output_df = update_qvalues(output_df)
+    output_df = update_qvalues(output_df, args.filter_qvalue, args.filter_decoy)
     output_df.to_csv(args.output_file, index=False)
